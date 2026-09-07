@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画像ギャラリー</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --text: #e8e8e8;
+    --muted: #9aa0a6;
+    --accent: #4f8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+  p.desc {
+    color: var(--muted);
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+  }
+  #status {
+    color: var(--muted);
+    font-size: 0.9rem;
+    padding: 12px 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: var(--text);
+    border: 1px solid #2a2e37;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+  }
+  .card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    background: #000;
+  }
+  .card .name {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    word-break: break-all;
+  }
+  .error {
+    color: #ff6b6b;
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>画像ギャラリー</h1>
+<p class="desc"><code>images</code> フォルダに画像ファイルを置くと自動でここに一覧表示されます。</p>
+
+<div id="status">読み込み中...</div>
+<div class="grid" id="gallery"></div>
+
+<script>
+// ==== ここを自分のリポジトリに合わせて設定 ====
+const GITHUB_USER   = "your-username";   // GitHubのユーザー名 or Organization名
+const GITHUB_REPO   = "your-repo";       // リポジトリ名
+const GITHUB_BRANCH = "main";            // ブランチ名 (main / master など)
+const IMAGES_PATH    = "images";          // 画像を置くフォルダ名
+// ===============================================
+
+const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"];
+
+const statusEl = document.getElementById("status");
+const galleryEl = document.getElementById("gallery");
+
+function isImage(filename) {
+  const lower = filename.toLowerCase();
+  return IMAGE_EXT.some(ext => lower.endsWith(ext));
+}
+
+async function loadImages() {
+  const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${IMAGES_PATH}?ref=${GITHUB_BRANCH}`;
+
+  try {
+    const res = await fetch(apiUrl);
+    if (!res.ok) {
+      throw new Error(`GitHub APIエラー: ${res.status}`);
+    }
+    const files = await res.json();
+
+    if (!Array.isArray(files)) {
+      throw new Error("images フォルダが見つかりません。GITHUB_USER / GITHUB_REPO / IMAGES_PATH の設定を確認してください。");
+    }
+
+    const images = files.filter(f => f.type === "file" && isImage(f.name));
+
+    if (images.length === 0) {
+      statusEl.textContent = `画像がありません。「${IMAGES_PATH}」フォルダに画像をアップロードしてください。`;
+      return;
+    }
+
+    statusEl.textContent = `${images.length} 件の画像`;
+
+    images
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(file => {
+        const a = document.createElement("a");
+        a.className = "card";
+        a.href = file.download_url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+
+        const img = document.createElement("img");
+        img.src = file.download_url;
+        img.alt = file.name;
+        img.loading = "lazy";
+
+        const name = document.createElement("div");
+        name.className = "name";
+        name.textContent = file.name;
+
+        a.appendChild(img);
+        a.appendChild(name);
+        galleryEl.appendChild(a);
+      });
+
+  } catch (err) {
+    statusEl.innerHTML = `<span class="error">読み込みエラー: ${err.message}</span>`;
+  }
+}
+
+loadImages();
+</script>
+
+</body>
+</html>
